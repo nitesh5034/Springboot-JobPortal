@@ -1,33 +1,36 @@
 package com.util;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
+import javax.sql.DataSource;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+@Component
 public class DBUtil 
 {
-	Connection cn=null;
-	public  Connection getConnection()
+	private static DataSource dataSource;
+
+	@Autowired
+	public void setDataSource(DataSource ds) {
+		DBUtil.dataSource = ds;
+	}
+
+	public Connection getConnection()
 	{
 		try 
 		{
-			Class.forName("com.mysql.jdbc.Driver");
-			cn=DriverManager.getConnection("jdbc:mysql://localhost:3306/jobportal","root","");
-			System.out.println("connection established");
-		
-		if(cn!=null)
-		{
-			System.out.println("connection is successfully");
+			Connection cn = dataSource.getConnection();
+			if(cn != null) {
+				System.out.println("connection is successfully established from pool");
+			}
+			return cn;
 		}
-	}
 		catch (Exception e) 
 		{
 			System.out.println("db connection error");
 			e.printStackTrace();
+			return null;
 		}
-		if(cn==null)
-		{
-			System.out.println("connetion is null");
-		}
-		return cn;
 	}
 }

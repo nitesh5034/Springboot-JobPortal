@@ -1,83 +1,86 @@
 package com.controller;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Properties;
-import java.util.Scanner;
 
-import javax.mail.Authenticator;
-import javax.mail.Message;
-import javax.mail.MessagingException;
-import javax.mail.PasswordAuthentication;
-import javax.mail.Session;
-import javax.mail.Transport;
-import javax.mail.internet.InternetAddress;
-import javax.mail.internet.MimeMessage;
-
-import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.MultipartConfig;
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.Part;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 
-import com.dao.applyDao;
+import com.Repository.ApplyRepository;
 import com.model.applymodel;
 
-@WebServlet("/ApplyServlet")
-@MultipartConfig(maxFileSize = 1024 * 1024 * 10) // 10MB limit
-public class apply extends HttpServlet {
+import jakarta.mail.*;
+import jakarta.mail.internet.*;
+@Controller
+public class apply {
 
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        
+    @Autowired
+    private ApplyRepository applyRepository;
+    @GetMapping("/ApplyServlet")
+    public String doGet() {
+        return "redirect:/index.jsp";
+    }
+
+    @PostMapping("/ApplyServlet")
+    public String doPost(
+            @RequestParam("job_id") String jobId,
+            @RequestParam("fullname") String name,
+            @RequestParam("email") String email,
+            @RequestParam("mobileno") String mobileno,
+            @RequestParam("city") String city,
+            @RequestParam("experience") String experience,
+            @RequestParam("resume") MultipartFile resumeFile,
+            HttpServletRequest request) {
+
         try {
-            String jobId = getFieldValue(request.getPart("job_id"));
-            String name = getFieldValue(request.getPart("fullname"));
-            String email = getFieldValue(request.getPart("email"));
-
             applymodel amodel = new applymodel();
-            amodel.setJob_id(Integer.parseInt(jobId));
+            amodel.setJobId(Integer.parseInt(jobId));
             amodel.setFullname(name);
             amodel.setEmail(email);
-            amodel.setMobileno(getFieldValue(request.getPart("mobileno")));
-            amodel.setCity(getFieldValue(request.getPart("city")));
-            amodel.setExperience(getFieldValue(request.getPart("experience")));
+            amodel.setMobileno(mobileno);
+            amodel.setCity(city);
+            amodel.setExperience(experience);
             amodel.setStatus("Pending");
 
-            // --- 🔴 ફાઈલ સેવ કરવાનું લોજિક ---
-            Part filePart = request.getPart("resume");
-            String fileName = (filePart != null) ? filePart.getSubmittedFileName() : "no_resume.pdf";
+            String fileName = (resumeFile != null && !resumeFile.isEmpty())
+                    ? resumeFile.getOriginalFilename()
+                    : "no_resume.pdf";
             amodel.setResume(fileName);
 
-            if (filePart != null && !fileName.isEmpty()) {
-                String uploadPath = getServletContext().getRealPath("") + File.separator + "uploads";
+            if (resumeFile != null && !resumeFile.isEmpty()) {
+                String uploadPath = request.getServletContext().getRealPath("") + File.separator + "uploads";
                 File uploadDir = new File(uploadPath);
-                if (!uploadDir.exists()) uploadDir.mkdir();
-                
-                // ફાઈલને ડ્રાઈવ પર લખવી
-                filePart.write(uploadPath + File.separator + fileName);
+                if (!uploadDir.exists()) {
+                    uploadDir.mkdir();
+                }
+
+                File destFile = new File(uploadPath + File.separator + fileName);
+                resumeFile.transferTo(destFile);
             }
 
-            applyDao dao = new applyDao();
-            int result = dao.apply(amodel);
-            
-            if (result > 0) {
+            applymodel savedModel = applyRepository.save(amodel);
+
+            if (savedModel != null) {
                 sendEasyEmail(email, name, jobId);
-                response.sendRedirect("Application-track.jsp?msg=success");
+                return "redirect:/Application-track.jsp?msg=success";
             } else {
-                response.sendRedirect("apply.jsp?msg=error");
+                return "redirect:/apply.jsp?msg=error";
             }
-            
+
         } catch (Exception e) {
             e.printStackTrace();
-            response.sendRedirect("apply.jsp?msg=error");
+            return "redirect:/apply.jsp?msg=error";
         }
     }
 
     private void sendEasyEmail(String to, String name, String jobId) {
-        final String myEmail = "niteshchaudhary3570@gmail.com";
-        final String myPass = "ftfj aeas afzb lrhu"; 
+        final String myEmail = "niteshchaudhari0623@gmail.com";
+        final String myPass = "lxtb gqzv ghde uhld";
 
         Properties props = new Properties();
         props.put("mail.smtp.host", "smtp.gmail.com");
@@ -88,6 +91,7 @@ public class apply extends HttpServlet {
         props.put("mail.smtp.ssl.trust", "smtp.gmail.com");
 
         Session session = Session.getInstance(props, new Authenticator() {
+            @Override
             protected PasswordAuthentication getPasswordAuthentication() {
                 return new PasswordAuthentication(myEmail, myPass);
             }
@@ -102,13 +106,6 @@ public class apply extends HttpServlet {
             Transport.send(msg);
         } catch (MessagingException e) {
             e.printStackTrace();
-        }
-    }
-
-    private String getFieldValue(Part part) throws IOException {
-        if (part == null) return "";
-        try (Scanner s = new Scanner(part.getInputStream())) {
-            return s.hasNext() ? s.nextLine().trim() : "";
         }
     }
 }

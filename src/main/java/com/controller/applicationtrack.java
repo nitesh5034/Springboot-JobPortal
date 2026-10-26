@@ -1,44 +1,43 @@
 package com.controller;
 
-import java.io.IOException;
 import java.util.List;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 
-import com.dao.ApplicationDAO;
+import com.Repository.ApplicationTrackRepository;
 import com.model.ApplicationModel;
 
-@WebServlet("/TrackingController")
-public class applicationtrack extends HttpServlet {
-    private static final long serialVersionUID = 1L;
+@Controller
+public class applicationtrack {
 
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
-            throws ServletException, IOException {
-        HttpSession session = request.getSession();
+    @Autowired
+    private ApplicationTrackRepository applicationTrackRepository; // DAO ki jagah direct Repository inject ki
+
+    @GetMapping("/TrackingController")
+    public String doGet(HttpSession session, Model model) {
         Integer userId = (Integer) session.getAttribute("userId");
         if (userId == null) {
-            response.sendRedirect("login.jsp");
-            return;
+            return "redirect:/login.jsp";
         }
 
         try {
-            ApplicationDAO dao = new ApplicationDAO();
-            List<ApplicationModel> userApps = dao.getTrackingDetails(userId);
-            request.setAttribute("userApps", userApps);
-            request.getRequestDispatcher("track_status.jsp").forward(request, response);
+
+            List<ApplicationModel> userApps = applicationTrackRepository.findByUserid(userId);
+            model.addAttribute("userApps", userApps);
+            return "forward:/track-status.jsp";
 
         } catch (Exception e) {
             e.printStackTrace();
-            response.getWriter().print("Error in tracking: " + e.getMessage());
+            return "redirect:/index.jsp?msg=tracking_error";
         }
     }
 
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
-            throws ServletException, IOException {
-        doGet(request, response);
+    @PostMapping("/TrackingController")
+    public String doPost(HttpSession session, Model model) {
+        return doGet(session, model);
     }
 }

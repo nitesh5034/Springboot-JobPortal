@@ -87,7 +87,7 @@
                 </li>
 
                 <li class="nxl-item">
-                    <a href="admin-applications.jsp" class="nxl-link">
+                    <a href="admin-application.jsp" class="nxl-link">
                         <span class="nxl-micon"><i class="feather-file-text"></i></span>
                         <span class="nxl-mtext">Applications</span>
                     </a>

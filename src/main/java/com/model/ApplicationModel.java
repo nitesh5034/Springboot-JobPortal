@@ -1,8 +1,15 @@
 package com.model;
 
+import jakarta.persistence.*;
+
+@Entity
+
 public class ApplicationModel  
 {
-	private int appid,userid,jobid,viewcount;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private int appid;
+	private int userid,jobid,viewcount;
 	private String status;
 	public int getAppid() {
 		return appid;

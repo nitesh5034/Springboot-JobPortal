@@ -1,0 +1,39 @@
+{
+  "name": "novaflow-scraper",
+  "version": "1.0.0",
+  "description": "Enterprise Web Scraping & Automation Platform",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "worker": "node src/worker.js",
+    "dev": "nodemon src/server.js",
+    "dev:worker": "nodemon src/worker.js",
+    "migrate": "node src/db/migrate.js",
+    "test": "jest --coverage",
+    "health": "bash scripts/healthcheck.sh"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "bull": "^4.12.3",
+    "ioredis": "^5.4.0",
+    "pg": "^8.12.0",
+    "axios": "^1.7.2",
+    "cheerio": "^1.0.0-rc.12",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "ajv": "^8.16.0",
+    "winston": "^3.13.0",
+    "uuid": "^10.0.0",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.3.1",
+    "robots-parser": "^3.0.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.4",
+    "supertest": "^7.0.0"
+  }
+}

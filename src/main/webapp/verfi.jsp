@@ -1,7 +1,16 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ page import="com.model.companyverify" %>
 <%@ page import="com.model.UserModel" %>
 <%
-  UserModel m = (UserModel) session.getAttribute("Model");
+    Object sessionModel = session.getAttribute("Model");
+    companyverify compModel = null;
+    UserModel userModel = null;
+
+    if (sessionModel instanceof companyverify) {
+        compModel = (companyverify) sessionModel;
+    } else if (sessionModel instanceof UserModel) {
+        userModel = (UserModel) sessionModel;
+    }
 %>
 <!DOCTYPE html>
 <html lang="en">

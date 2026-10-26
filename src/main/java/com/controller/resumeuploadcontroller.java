@@ -1,30 +1,32 @@
 package com.controller;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.UUID;
 
-import com.dao.ResumeDAO;
 import com.model.resumemodel;
+import com.Repository.ResumeRepository;
 
-import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.MultipartConfig;
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.Part;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.multipart.MultipartFile;
 
-@WebServlet("/UploadServlet")
-@MultipartConfig(
-    fileSizeThreshold = 1024 * 1024 * 2,
-    maxFileSize = 1024 * 1024 * 10,
-    maxRequestSize = 1024 * 1024 * 50
-)
-public class resumeuploadcontroller extends HttpServlet {
+@Controller
+public class resumeuploadcontroller {
 
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+    @Autowired
+    private ResumeRepository resumeRepository; // DAO ki jagah direct repository inject ki
+
+    @GetMapping("/UploadServlet")
+    public String doGet() {
+        return "redirect:/index.jsp";
+    }
+
+    @PostMapping("/UploadServlet")
+    public String doPost(@RequestParam("resume") MultipartFile resumeFile, HttpServletRequest request) {
 
         String uploadPath = request.getServletContext().getRealPath("")
                 + File.separator + "uploads";
@@ -35,33 +37,30 @@ public class resumeuploadcontroller extends HttpServlet {
         }
 
         try {
-            Part part = request.getPart("resume");
-            String fileName = part.getSubmittedFileName();
+            String fileName = resumeFile.getOriginalFilename();
 
             if (fileName != null && !fileName.isEmpty()) {
 
                 String uniqueName = UUID.randomUUID().toString() + "_" + fileName;
 
-                
-                part.write(uploadPath + File.separator + uniqueName);
+                File destFile = new File(uploadPath + File.separator + uniqueName);
+                resumeFile.transferTo(destFile);
 
-                
+                // Model data set kiya
                 resumemodel rm = new resumemodel();
                 rm.setFilename(fileName);
                 rm.setFilepath(uniqueName);
 
-               
-                ResumeDAO dao = new ResumeDAO();
-                dao.saveResume(rm);
+                resumeRepository.save(rm);
 
-                response.getWriter().print("✅ File uploaded & data saved successfully!");
+                return "redirect:/index.jsp?msg=upload_success";
             } else {
-                response.getWriter().print("❌ No file selected");
+                return "redirect:/index.jsp?msg=no_file";
             }
 
         } catch (Exception e) {
             e.printStackTrace();
-            response.getWriter().print("❌ Error: " + e.getMessage());
+            return "redirect:/index.jsp?msg=error";
         }
     }
 }

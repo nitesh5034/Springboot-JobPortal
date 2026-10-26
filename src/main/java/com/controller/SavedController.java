@@ -1,47 +1,53 @@
 package com.controller;
 
-import com.dao.userdao;
+import com.Repository.JobRepository;
 import com.model.UserModel;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
+import jakarta.servlet.http.HttpSession;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.PostMapping;
 
-@WebServlet("/SaveJobServlet")
-public class SavedController extends HttpServlet {
+@Controller
+public class SavedController {
 
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+    @Autowired
+    private JobRepository jobRepo;
 
-        UserModel u = (UserModel) request.getSession().getAttribute("Model");
+    @PostMapping("/SaveJobServlet")
+    public String handleSaveJob(HttpServletRequest request, HttpSession session) {
+        UserModel u = (UserModel) session.getAttribute("Model");
         if (u == null) {
-            response.sendRedirect("login.jsp");
-            return;
+            return "redirect:/login.jsp";
         }
 
-        String jobIdStr = request.getParameter("jobId");
-        String act      = request.getParameter("action");
-
-        // ✅ Null/empty check
+        String actionStr = request.getParameter("action");
+        String jobIdStr  = request.getParameter("jobId");
         if (jobIdStr == null || jobIdStr.trim().isEmpty()) {
-            response.sendRedirect("saved-jobs.jsp?msg=error");
-            return;
+            jobIdStr = request.getParameter("job_id");
         }
 
-        int jobId = Integer.parseInt(jobIdStr.trim());
+        try {
+            if (jobIdStr != null && !jobIdStr.trim().isEmpty()) {
+                int jobId  = Integer.parseInt(jobIdStr.trim());
+                int userId = u.getUserid();
 
-        userdao dao = new userdao();
-
-        if ("save".equals(act)) {
-            dao.saveJob(u.getUserid(), jobId);
-            response.sendRedirect("Saved-jobs.jsp?msg=saved");
-        } else if ("remove".equals(act)) {
-            dao.removeSavedJob(u.getUserid(), jobId);
-            response.sendRedirect("Saved-jobs.jsp?msg=removed");
-        } else {
-            response.sendRedirect("saved-jobs.jsp");
+                if ("remove".equalsIgnoreCase(actionStr)) {
+                    jobRepo.deleteSavedJob(userId, jobId);
+                    return "redirect:/Saved-jobs.jsp?msg=removed";
+                } else if ("save".equalsIgnoreCase(actionStr)) {
+                    try {
+                        jobRepo.saveJobForUser(userId, jobId);
+                    } catch (Exception ignored) {
+                        // Job is already saved
+                    }
+                    return "redirect:/Saved-jobs.jsp?msg=saved";
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+
+        return "redirect:/Saved-jobs.jsp";
     }
 }

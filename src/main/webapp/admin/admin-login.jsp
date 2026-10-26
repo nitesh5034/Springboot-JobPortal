@@ -1,22 +1,35 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ page import="com.model.UserModel" %>
 <%
-  // Simple admin login check
+  String logout = request.getParameter("msg");
+  String errorMsg = null;
+
   if ("POST".equalsIgnoreCase(request.getMethod())) {
     String username = request.getParameter("username");
     String password = request.getParameter("password");
 
+    if (username != null) username = username.trim();
+    if (password != null) password = password.trim();
+
+    System.out.println(">>> ADMIN LOGIN ATTEMPT: username=[" + username + "], password=[" + password + "]");
+
     if ("admin".equals(username) && "admin123".equals(password)) {
+
+      UserModel adminModel = new UserModel();
+      adminModel.setFirstname("Admin");
+      adminModel.setRole("ADMIN");
+      adminModel.setEmail("admin@jobboard.com");
+
+      session.setAttribute("Model", adminModel);
       session.setAttribute("adminRole", "admin");
       session.setAttribute("adminName", username);
+
       response.sendRedirect("admin-dashboard.jsp");
       return;
     } else {
-      request.setAttribute("error", "invalid");
+      errorMsg = "Invalid Username or Password!";
     }
   }
-
-  // Logout check
-  String logout = request.getParameter("msg");
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -100,7 +113,7 @@
   <div class="auth-left lg:w-5/12 xl:w-4/12 flex flex-col justify-between p-8 md:p-12 min-h-[260px] lg:min-h-screen">
 
     <div class="relative z-10">
-      <a href="index.jsp" class="font-sora font-bold text-2xl text-white tracking-tight">
+      <a href="../index.jsp" class="font-sora font-bold text-2xl text-white tracking-tight">
         Job<span class="text-yellow-400">Board</span>
       </a>
     </div>
@@ -152,7 +165,7 @@
     <div class="relative z-10">
       <p class="text-white/30 text-xs">
         Not an admin?
-        <a href="login.jsp" class="text-yellow-400 hover:text-yellow-300 font-semibold ml-1">Go to User Login</a>
+        <a href="../login.jsp" class="text-yellow-400 hover:text-yellow-300 font-semibold ml-1">Go to User Login</a>
       </p>
     </div>
   </div>
@@ -174,10 +187,10 @@
       </div>
 
       <!-- Error Message -->
-      <% if (request.getAttribute("error") != null) { %>
+      <% if (errorMsg != null) { %>
         <div class="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 mb-6">
           <i class="fas fa-exclamation-circle text-red-500 flex-shrink-0"></i>
-          <p class="text-sm text-red-700 font-medium">Invalid username or password. Try again.</p>
+          <p class="text-sm text-red-700 font-medium"><%= errorMsg %></p>
         </div>
       <% } %>
 
@@ -189,8 +202,8 @@
         </div>
       <% } %>
 
-      <!-- FORM — same page pe post kare che -->
-      <form action="admin-login.jsp" method="post" class="space-y-5">
+      <!-- FORM -->
+      <form action="" method="post" class="space-y-5">
 
         <!-- Username -->
         <div>

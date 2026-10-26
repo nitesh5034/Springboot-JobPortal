@@ -1,12 +1,30 @@
-
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="com.dao.userdao, com.model.UserModel, com.model.Postjob, java.util.List" %>
-<%
-    UserModel u = (UserModel) session.getAttribute("Model");
-    if (u == null) { response.sendRedirect("login.jsp"); return; }
+<%@ page import="com.model.UserModel, com.model.Postjob" %>
+<%@ page import="com.Repository.JobRepository" %>
+<%@ page import="org.springframework.web.context.WebApplicationContext" %>
+<%@ page import="org.springframework.web.context.support.WebApplicationContextUtils" %>
+<%@ page import="java.util.List, java.util.ArrayList" %>
 
-    userdao dao = new userdao();
-    List<Postjob> savedJobs = dao.getSavedJobs(u.getUserid());
+<%
+    // 1. Session Guard Check
+    UserModel u = (UserModel) session.getAttribute("Model");
+    if (u == null) {
+        response.sendRedirect("login.jsp");
+        return;
+    }
+
+    // 2. Fetch Repositories
+    WebApplicationContext ctx = WebApplicationContextUtils.getWebApplicationContext(application);
+    JobRepository jobRepo     = ctx.getBean(JobRepository.class);
+
+    // 3. Fetch Saved Jobs
+    List<Postjob> savedJobs = new ArrayList<>();
+    try {
+        savedJobs = jobRepo.findSavedJobsByUserId(u.getUserid());
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+
     String msg = request.getParameter("msg");
 %>
 <!DOCTYPE html>
@@ -60,21 +78,21 @@
     .btn-remove {
       background: #fef2f2; border: 1px solid #fecaca;
       color: #dc2626; font-size: 12px; font-weight: 600;
-      padding: 7px 14px; border-radius: 8px;
+      padding: 8px 16px; border-radius: 10px;
       cursor: pointer; transition: all 0.2s;
-      display: flex; align-items: center; gap: 5px;
+      display: flex; align-items: center; gap: 6px;
     }
     .btn-remove:hover { background: #fee2e2; transform: translateY(-1px); }
 
     .btn-apply {
       background: #1a56db; color: white;
       font-size: 12px; font-weight: 600;
-      padding: 7px 14px; border-radius: 8px;
+      padding: 8px 16px; border-radius: 10px;
       cursor: pointer; transition: all 0.2s;
-      display: flex; align-items: center; gap: 5px;
-      text-decoration: none;
+      display: flex; align-items: center; gap: 6px;
+      border: none;
     }
-    .btn-apply:hover { background: #1347c0; transform: translateY(-1px); }
+    .btn-apply:hover { background: #1347c0; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,86,219,0.3); }
 
     .toast {
       position: fixed; top: 20px; right: 20px;
@@ -92,15 +110,26 @@
       background: white; border-radius: 20px;
       border: 1.5px dashed #e2e8f0;
     }
+
+    /* Modal Backdrop */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(4px);
+      z-index: 999; align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
   </style>
 </head>
 <body>
 
-<!-- TOAST -->
+<!-- TOAST NOTIFICATIONS -->
 <% if ("saved".equals(msg)) { %>
   <div class="toast success" id="toast"><i class="fas fa-bookmark"></i> Job saved successfully!</div>
 <% } else if ("removed".equals(msg)) { %>
   <div class="toast info" id="toast"><i class="fas fa-trash"></i> Job removed from saved list.</div>
+<% } else if ("applied".equals(msg)) { %>
+  <div class="toast success" id="toast"><i class="fas fa-check-circle"></i> Application submitted successfully!</div>
 <% } %>
 
 <!-- HERO -->
@@ -118,7 +147,7 @@
   </div>
 </div>
 
-<!-- CONTENT -->
+<!-- CONTENT CONTAINER -->
 <div class="max-w-5xl mx-auto px-5 -mt-8 pb-16">
 
   <% if (savedJobs.isEmpty()) { %>
@@ -148,7 +177,7 @@
       <div class="job-card">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
 
-          <!-- Job Info -->
+          <!-- Job Details -->
           <div style="display:flex;align-items:center;gap:14px;flex:1;min-width:200px;">
             <div class="company-initial"><%= initial %></div>
             <div>
@@ -175,31 +204,24 @@
 
           <!-- Action Buttons -->
           <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-            <!-- Remove -->
+
+            <!-- Remove Form -->
             <form action="SaveJobServlet" method="post" style="display:inline;">
-              <!-- primary names used in your code -->
-              <input type="hidden" name="jobId" value="<%= job.getJob_id() %>">
+              <input type="hidden" name="jobId" value="<%= job.getJobId() %>">
               <input type="hidden" name="action" value="remove">
-              <!-- add explicit user id so servlet can fallback if session is missing -->
               <input type="hidden" name="userId" value="<%= u.getUserid() %>">
-              <!-- include common alternative parameter names to avoid mismatch with servlet -->
-              <input type="hidden" name="job_id" value="<%= job.getJob_id() %>">
-              <input type="hidden" name="userid" value="<%= u.getUserid() %>">
-              <input type="hidden" name="user_id" value="<%= u.getUserid() %>">
-              <button type="submit" class="btn-remove"
-                onclick="return confirm('Remove from saved?')">
-                <i class="fas fa-trash text-xs"></i> Remove
+              <button type="submit" class="btn-remove">
+                <i class="fas fa-trash-alt text-xs"></i> Remove
               </button>
             </form>
-            <!-- Apply -->
-            <a href="user-home.jsp#job-<%= job.getJob_id() %>" class="btn-apply">
-              <i class="fas fa-paper-plane text-xs"></i> Apply
-            </a>
+
+            <!-- DIRECT APPLY POPUP BUTTON -->
+            <button type="button" class="btn-apply" onclick="openApplyModal('<%= job.getJobId() %>', '<%= job.getJob_Title() %>', '<%= job.getCompany_name() %>')">
+              <i class="fas fa-paper-plane text-xs"></i> Apply Directly
+            </button>
+
           </div>
         </div>
-
-        
-
 
         <!-- Description Preview -->
         <% if (job.getJob_Description() != null && !job.getJob_Description().isEmpty()) { %>
@@ -217,7 +239,84 @@
   <% } %>
 </div>
 
+<!-- ================= DIRECT APPLY MODAL ================= -->
+<div id="applyModal" class="modal-backdrop">
+  <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden m-4 animate-fade-up">
+
+    <!-- Modal Header -->
+    <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+      <div>
+        <h3 class="font-sora font-bold text-base" id="modalJobTitle">Apply Position</h3>
+        <p class="text-xs text-white/60" id="modalCompanyName">Company Name</p>
+      </div>
+      <button type="button" onclick="closeApplyModal()" class="text-white/60 hover:text-white text-lg">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <!-- Application Form -->
+    <form action="ApplyServlet" method="post" enctype="multipart/form-data" class="p-6 space-y-4">
+      <input type="hidden" name="jobId" id="modalJobId" value="">
+      <input type="hidden" name="job_id" id="modalJobIdAlt" value="">
+
+      <div>
+        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Full Name</label>
+        <input type="text" name="fullname" value="<%= u.getFirstname() != null ? u.getFirstname() + " " + (u.getLastname() != null ? u.getLastname() : "") : "" %>" class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-blue-600" required>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Email Address</label>
+        <input type="email" name="email" value="<%= u.getEmail() != null ? u.getEmail() : "" %>" class="w-full border border-gray-200 bg-gray-50 text-gray-500 rounded-xl px-3.5 py-2.5 text-sm outline-none" readonly>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Contact Mobile</label>
+          <input type="text" name="mobileno" value="<%= u.getContact() != null ? u.getContact() : "" %>" class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-blue-600" required>
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase text-gray-600 mb-1">City</label>
+          <input type="text" name="city" value="<%= u.getCity() != null ? u.getCity() : "" %>" class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-blue-600" required>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Total Experience (Years)</label>
+        <input type="text" name="experience" placeholder="e.g. 2" class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-blue-600" required>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Upload Resume (PDF / DOC)</label>
+        <input type="file" name="resume" accept=".pdf,.doc,.docx" class="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs text-gray-600 outline-none" required>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="pt-3 flex items-center justify-end gap-3 border-t border-gray-100">
+        <button type="button" onclick="closeApplyModal()" class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs font-semibold">
+          Cancel
+        </button>
+        <button type="submit" class="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md">
+          <i class="fas fa-paper-plane mr-1"></i> Submit Application
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
 <script>
+  function openApplyModal(jobId, jobTitle, companyName) {
+    document.getElementById('modalJobId').value = jobId;
+    document.getElementById('modalJobIdAlt').value = jobId;
+    document.getElementById('modalJobTitle').innerText = 'Applying for: ' + jobTitle;
+    document.getElementById('modalCompanyName').innerText = '@ ' + companyName;
+    document.getElementById('applyModal').classList.add('open');
+  }
+
+  function closeApplyModal() {
+    document.getElementById('applyModal').classList.remove('open');
+  }
+
   const toast = document.getElementById('toast');
   if (toast) setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s'; }, 3000);
 </script>

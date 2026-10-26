@@ -1,8 +1,18 @@
 package com.model;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+
+@Entity
 public class review 
 {
-int id,rating;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+private int id;
+
+	private int rating;
 String name,text;
 public int getId() {
 	return id;

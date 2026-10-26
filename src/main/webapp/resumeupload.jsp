@@ -139,14 +139,14 @@
 <!-- NAVBAR -->
 <header class="navbar-blur sticky top-0 z-50 border-b border-white/10">
   <div class="max-w-7xl mx-auto px-5 py-3 flex items-center justify-between gap-6">
-    <a href="userhome.jsp" class="font-sora font-bold text-xl text-white tracking-tight flex-shrink-0">
+    <a href="user-home.jsp" class="font-sora font-bold text-xl text-white tracking-tight flex-shrink-0">
       Job<span class="text-yellow-400">Board</span>
     </a>
     <nav class="hidden xl:flex items-center gap-1">
-      <a href="userhome.jsp" class="text-white/70 hover:text-white hover:bg-white/10 text-sm font-medium px-3 py-2 rounded-lg transition-all">
+      <a href="user-home.jsp" class="text-white/70 hover:text-white hover:bg-white/10 text-sm font-medium px-3 py-2 rounded-lg transition-all">
         <i class="fas fa-home mr-1.5 text-xs"></i>Home
       </a>
-      <a href="userhome.jsp" class="text-white/70 hover:text-white hover:bg-white/10 text-sm font-medium px-3 py-2 rounded-lg transition-all">
+      <a href="user-home.jsp" class="text-white/70 hover:text-white hover:bg-white/10 text-sm font-medium px-3 py-2 rounded-lg transition-all">
         <i class="fas fa-briefcase mr-1.5 text-xs"></i>Browse Jobs
       </a>
       <a href="Application-track.jsp" class="text-white/70 hover:text-white hover:bg-white/10 text-sm font-medium px-3 py-2 rounded-lg transition-all">

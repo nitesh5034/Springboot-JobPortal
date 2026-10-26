@@ -1,24 +1,44 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="com.model.UserModel" %>
-<%@ page import="com.dao.postjobdao" %>
-<%@ page import="com.dao.CompanyDao" %>
 <%@ page import="com.model.Postjob" %>
+<%@ page import="com.model.review" %>
 <%@ page import="java.util.List" %>
+<%@ page import="org.springframework.web.context.WebApplicationContext" %>
+<%@ page import="org.springframework.web.context.support.WebApplicationContextUtils" %>
+<%@ page import="com.Repository.JobRepository" %>
+<%@ page import="com.Repository.CompanyVerifyRepository" %>
+<%@ page import="com.Repository.ApplyRepository" %>
+<%@ page import="com.Repository.UserRepository" %>
+<%@ page import="com.Repository.ReviewRepository" %>
 <%
   UserModel m = (UserModel) session.getAttribute("Model");
   if (m == null) {
     response.sendRedirect("login.jsp");
     return;
   }
-  postjobdao jobDAO = new postjobdao();
-  CompanyDao companyDao = new CompanyDao();
 
-  List<Postjob> jobList = jobDAO.getAllJobs();
+  // Fetch Repositories from Spring Context
+  WebApplicationContext ctx = WebApplicationContextUtils.getWebApplicationContext(application);
+  JobRepository jobRepo               = ctx.getBean(JobRepository.class);
+  CompanyVerifyRepository companyRepo = ctx.getBean(CompanyVerifyRepository.class);
+  ApplyRepository applyRepo           = ctx.getBean(ApplyRepository.class);
+  UserRepository userRepo             = ctx.getBean(UserRepository.class);
+  ReviewRepository reviewRepo         = ctx.getBean(ReviewRepository.class);
 
-  int totalCandidates = companyDao.getTotalCandidates();
-  int totalJobs       = jobDAO.getTotalJobs();
-  int totalCompanies  = companyDao.getTotalCompanies();
-  int totalFilled     = companyDao.getTotalApplications();
+  List<Postjob> jobList = jobRepo.findAll();
+  List<review> reviewList = null;
+  try {
+      reviewList = reviewRepo.findAll();
+  } catch(Exception e) {
+      e.printStackTrace();
+  }
+
+  // Dynamic Counts from Database
+  int totalJobs       = (int) jobRepo.count();
+  int totalCompanies  = (int) companyRepo.count();
+  int totalFilled     = (int) applyRepo.count();
+  int totalCandidates = (int) userRepo.count();
+  String initial      = (m.getFirstname() != null && !m.getFirstname().isEmpty()) ? String.valueOf(m.getFirstname().charAt(0)).toUpperCase() : "U";
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -26,6 +46,8 @@
   <meta charset="UTF-8">
   <title>JobBoard — Find Your Dream Job</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Tailwind CSS & Google Fonts -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -33,601 +55,668 @@
         extend: {
           fontFamily: {
             sora: ['Sora', 'sans-serif'],
-            dm: ['DM Sans', 'sans-serif'],
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
           }
         }
       }
     }
   </script>
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <style>
-    body { font-family: 'DM Sans', sans-serif; }
-    h1,h2,h3,.font-sora { font-family: 'Sora', sans-serif; }
-    html { scroll-behavior: smooth; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #0f172a; overflow-x: hidden; }
+    .font-sora { font-family: 'Sora', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-    /* ── Navbar ── */
-    .navbar { position: sticky; top: 0; z-index: 999; background: rgba(6,11,20,0.97); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.08); }
-    .nav-link { color: rgba(255,255,255,0.65); font-size: 14px; font-weight: 500; text-decoration: none; padding: 6px 12px; border-radius: 8px; transition: all 0.2s; cursor: pointer; }
-    .nav-link:hover { color: #fff; background: rgba(255,255,255,0.08); }
+    /* ===== HERO MESH BACKGROUND ===== */
+    .hero-glow-mesh {
+      background: linear-gradient(-45deg, #030712, #0f172a, #1e1b4b, #090d16);
+      background-size: 400% 400%;
+      animation: gradientShift 12s ease infinite;
+      position: relative;
+      overflow: hidden;
+    }
 
-    /* ── JS-driven dropdowns (no CSS :hover) ── */
-    .nav-dropdown { position: relative; }
-    .nav-dropdown-menu {
-      display: none;
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .hero-glow-mesh::before {
+      content: ''; position: absolute; inset: 0;
+      background-image: linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      z-index: 1;
+    }
+
+    /* Live Canvas Layer */
+    #particleCanvas {
       position: absolute;
-      top: calc(100% + 8px);
+      top: 0;
       left: 0;
-      background: #0f172a;
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 12px;
-      padding: 6px;
-      min-width: 190px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      z-index: 1000;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
     }
-    .nav-dropdown-menu.show { display: block; }
-    .nav-dropdown-menu a {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 14px;
-      color: rgba(255,255,255,0.65);
-      font-size: 13px;
-      border-radius: 8px;
-      text-decoration: none;
-      transition: all 0.15s;
-      white-space: nowrap;
+
+    /* ===== GLOW GRADIENT TEXT ===== */
+    .text-glow-gradient {
+      background: linear-gradient(135deg, #a855f7 0%, #6366f1 50%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
-    .nav-dropdown-menu a:hover { background: rgba(255,255,255,0.08); color: #fff; }
 
-    /* ── Avatar dropdown ── */
-    .avatar-dropdown { position: relative; }
-    .avatar-dropdown-menu {
-      display: none;
-      position: absolute;
-      top: calc(100% + 10px);
-      right: 0;
-      background: #0f172a;
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 14px;
-      padding: 8px;
-      min-width: 210px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      z-index: 1000;
+    .badge-glow-gradient {
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%);
+      border: 1px solid rgba(168, 85, 247, 0.3);
     }
-    .avatar-dropdown-menu.show { display: block; }
-    .avatar-menu-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 9px 12px;
-      border-radius: 9px;
-      color: rgba(255,255,255,0.7);
-      font-size: 13px;
-      text-decoration: none;
-      transition: all 0.15s;
+
+    /* ===== SEARCH CARD IN HERO ===== */
+    .glow-search-card {
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
     }
-    .avatar-menu-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
-    .avatar-menu-item.danger { color: #f87171; }
-    .avatar-menu-item.danger:hover { background: rgba(248,113,113,0.1); }
 
-    /* ── Mobile menu ── */
-    .mobile-menu { display: none; background: #0a0f1a; border-top: 1px solid rgba(255,255,255,0.06); padding: 12px 16px 16px; }
-    .mobile-menu.open { display: block; }
-    .mobile-menu a { display: block; padding: 10px 12px; color: rgba(255,255,255,0.7); font-size: 14px; border-radius: 8px; text-decoration: none; transition: all 0.15s; }
-    .mobile-menu a:hover { background: rgba(255,255,255,0.08); color: #fff; }
-
-    /* ── Hero ── */
-    .hero-mesh { background: linear-gradient(135deg, #060b14 0%, #0f172a 40%, #1e3a5f 70%, #1a56db 100%); position: relative; overflow: hidden; }
-    .hero-mesh::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(ellipse 60% 50% at 80% 40%, rgba(26,86,219,0.25) 0%, transparent 70%), radial-gradient(ellipse 40% 40% at 20% 70%, rgba(245,158,11,0.10) 0%, transparent 60%); }
-    .hero-mesh::after { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 28px 28px; }
-
-    .search-input { border: none; outline: none; background: transparent; font-size: 14px; color: #0f172a; font-family: 'DM Sans', sans-serif; width: 100%; }
-    .search-input::placeholder { color: #94a3b8; }
-    .search-field-wrap { flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 10px; border: 1.5px solid transparent; transition: all 0.2s; }
-    .search-field-wrap:focus-within { border-color: #1a56db; background: #f0f6ff; }
-
-    /* ── Stats ── */
-    .stats-bg { background: linear-gradient(135deg, #1a56db 0%, #0f172a 100%); position: relative; overflow: hidden; }
-    .stats-bg::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 24px 24px; }
-
-    /* ── Job cards ── */
-    .job-card-item { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s; cursor: pointer; }
-    .job-card-item:hover { border-color: #1a56db; box-shadow: 0 4px 16px rgba(0,0,0,0.10); transform: translateY(-2px); }
-
-    /* ── Modal ── */
-    .job-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9999; align-items: center; justify-content: center; padding: 16px; }
-    .job-modal-overlay.active { display: flex; }
-    .job-modal-box { background: #fff; border-radius: 20px; padding: 32px; max-width: 580px; width: 100%; position: relative; max-height: 88vh; overflow-y: auto; animation: slideUp 0.25s ease; }
-    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-
-    .apply-form { display: none; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 4px; }
-    .apply-form.active { display: block; }
-    .apply-input { width: 100%; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; font-size: 14px; margin-bottom: 14px; font-family: 'DM Sans', sans-serif; color: #0f172a; outline: none; transition: border-color 0.2s; }
-    .apply-input:focus { border-color: #1a56db; }
-
-    .company-logo { filter: grayscale(100%); opacity: 0.4; transition: all 0.3s; }
-    .company-logo:hover { filter: none; opacity: 1; }
-
-    @media(max-width: 640px) {
-      .job-card-item { flex-direction: column; align-items: flex-start; gap: 12px; }
+    /* ===== CLEAN WHITE JOB CARDS ===== */
+    .job-card-clean {
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 24px;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
     }
+    .job-card-clean:hover {
+      border-color: #6366f1;
+      box-shadow: 0 12px 30px -5px rgba(99, 102, 241, 0.15);
+      transform: translateY(-2px);
+    }
+
+    /* ===== DROPDOWN ANIMATION ===== */
+    .dropdown-custom {
+      display: none; position: absolute; top: calc(100% + 12px); right: 0;
+      background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px; padding: 10px; min-width: 240px;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.6); z-index: 1000;
+    }
+    .dropdown-custom.show { display: block; animation: floatUp 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes floatUp { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Modal Backdrop */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(8px); z-index: 9999;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-backdrop.active { display: flex; }
   </style>
 </head>
-<body class="bg-white antialiased">
+<body class="antialiased">
 
-<!-- ══════════════════════════════════════════
-     NAVBAR
-══════════════════════════════════════════ -->
-<nav class="navbar">
-  <div class="max-w-7xl mx-auto px-5">
-    <div class="flex items-center justify-between h-16">
+<!-- ===== HERO NAVBAR ===== -->
+<nav class="fixed top-0 inset-x-0 z-50 bg-[#030712]/80 backdrop-blur-xl border-b border-white/10">
+  <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
 
-      <!-- Logo -->
-      <a href="user-home.jsp" class="font-sora font-bold text-xl text-white tracking-tight">
-        Job<span class="text-yellow-400">Board</span>
+    <!-- Brand Logo -->
+    <a href="user-home.jsp" class="font-sora font-extrabold text-2xl text-white tracking-tight flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-sky-400 p-[1px] flex items-center justify-center shadow-lg shadow-indigo-500/30">
+        <div class="w-full h-full bg-[#030712] rounded-[11px] flex items-center justify-center">
+          <i class="fas fa-briefcase text-xs text-indigo-400"></i>
+        </div>
+      </div>
+      Job<span class="text-glow-gradient">Board</span>
+    </a>
+
+    <!-- Navigation Links -->
+    <div class="hidden lg:flex items-center gap-2">
+      <a href="user-home.jsp" class="text-white bg-white/10 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all border border-white/10">
+        <i class="fas fa-compass mr-2 text-indigo-400"></i> Explore Jobs
       </a>
-
-      <!-- Desktop links -->
-      <div class="hidden md:flex items-center gap-1">
-        <a href="user-home.jsp" class="nav-link"><i class="fas fa-home mr-1 text-xs"></i> Home</a>
-
-        <!-- My Account dropdown -->
-        <div class="nav-dropdown">
-          <span class="nav-link" id="accountDropBtn">
-            My Account <i class="fas fa-chevron-down ml-1 text-xs"></i>
-          </span>
-          <div class="nav-dropdown-menu" id="accountDropMenu">
-            <a href="ViewProfile.jsp"><i class="fas fa-user text-xs opacity-60"></i> View Profile</a>
-            <a href="edit-profile.jsp"><i class="fas fa-edit text-xs opacity-60"></i> Edit Profile</a>
-            <a href="Application-track.jsp"><i class="fas fa-file-alt text-xs opacity-60"></i> My Applications</a>
-            <a href="Saved-jobs.jsp"><i class="fas fa-bookmark text-xs opacity-60"></i> Saved Jobs</a>
-          </div>
-        </div>
-
-        <a href="contact.jsp" class="nav-link"><i class="fas fa-envelope mr-1 text-xs"></i> Contact</a>
-      </div>
-
-      <!-- Right side: bell + avatar -->
-      <div class="flex items-center gap-3">
-        <button class="relative w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-all">
-          <i class="fas fa-bell text-sm"></i>
-          <span class="absolute top-1 right-1 w-2 h-2 bg-yellow-400 rounded-full"></span>
-        </button>
-
-        <!-- Avatar dropdown -->
-        <div class="avatar-dropdown">
-          <button class="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/15 rounded-full pl-1 pr-3 py-1 transition-all" id="avatarDropBtn">
-            <div class="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center font-sora font-bold text-white text-xs">
-              <%= m.getFirstname().substring(0,1).toUpperCase() %>
-            </div>
-            <span class="text-white text-sm font-medium hidden sm:block"><%= m.getFirstname() %></span>
-            <i class="fas fa-chevron-down text-white/50 text-xs" id="avatarChevron"></i>
-          </button>
-          <div class="avatar-dropdown-menu" id="avatarDropMenu">
-            <div class="px-3 py-2 mb-1 border-b border-white/10">
-              <p class="text-white text-sm font-semibold"><%= m.getFirstname() %> <%= m.getLastname() %></p>
-              <p class="text-white/40 text-xs"><%= m.getEmail() %></p>
-            </div>
-            <a href="ViewProfile.jsp" class="avatar-menu-item"><i class="fas fa-user text-xs opacity-60"></i> View Profile</a>
-            <a href="edit-profile.jsp" class="avatar-menu-item"><i class="fas fa-edit text-xs opacity-60"></i> Edit Profile</a>
-            <a href="Application-track.jsp" class="avatar-menu-item"><i class="fas fa-file-alt text-xs opacity-60"></i> My Applications</a>
-            <a href="Saved-jobs.jsp" class="avatar-menu-item"><i class="fas fa-bookmark text-xs opacity-60"></i> Saved Jobs</a>
-            <div class="border-t border-white/10 mt-1 pt-1">
-              <a href="LogoutServlet" class="avatar-menu-item danger"><i class="fas fa-sign-out-alt text-xs"></i> Logout</a>
-            </div>
-          </div>
-        </div>
-
-        <!-- Mobile hamburger -->
-        <button class="md:hidden w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white" id="mobileToggle">
-          <i class="fas fa-bars text-sm" id="menuIcon"></i>
-        </button>
-      </div>
-
+      <a href="Application-track.jsp" class="text-slate-300 hover:text-white hover:bg-white/5 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all">
+        Applications Tracker
+      </a>
+      <a href="Saved-jobs.jsp" class="text-slate-300 hover:text-white hover:bg-white/5 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all">
+        Saved Jobs
+      </a>
+      <a href="review.jsp" class="text-slate-300 hover:text-white hover:bg-white/5 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all">
+        Reviews
+      </a>
+      <a href="contact.jsp" class="text-slate-300 hover:text-white hover:bg-white/5 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all">
+        Support
+      </a>
     </div>
-  </div>
 
-  <!-- Mobile menu -->
-  <div class="mobile-menu" id="mobileMenu">
-    <a href="user-home.jsp"><i class="fas fa-home mr-2 text-xs opacity-60"></i> Home</a>
-    <a href="ViewProfile.jsp"><i class="fas fa-user mr-2 text-xs opacity-60"></i> View Profile</a>
-    <a href="edit-profile.jsp"><i class="fas fa-edit mr-2 text-xs opacity-60"></i> Edit Profile</a>
-    <a href="Application-track.jsp"><i class="fas fa-file-alt mr-2 text-xs opacity-60"></i> My Applications</a>
-    <a href="Saved-jobs.jsp"><i class="fas fa-bookmark mr-2 text-xs opacity-60"></i> Saved Jobs</a>
-    <a href="contact.jsp"><i class="fas fa-envelope mr-2 text-xs opacity-60"></i> Contact</a>
-    <div class="border-t border-white/10 mt-2 pt-2">
-      <a href="LogoutServlet" style="color:#f87171;"><i class="fas fa-sign-out-alt mr-2 text-xs"></i> Logout</a>
+    <!-- Right Profile Controls -->
+    <div class="flex items-center gap-4">
+
+      <!-- User Menu -->
+      <div class="relative">
+        <button id="avatarBtn" class="flex items-center gap-3 bg-slate-900/80 hover:bg-slate-800 border border-white/10 rounded-full pl-1.5 pr-4 py-1.5 transition-all shadow-lg">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 text-white font-sora font-extrabold text-xs flex items-center justify-center shadow-md">
+            <%= initial %>
+          </div>
+          <span class="text-white text-xs font-semibold hidden sm:inline-block"><%= m.getFirstname() %></span>
+          <i class="fas fa-chevron-down text-slate-400 text-[10px]"></i>
+        </button>
+
+        <div id="avatarMenu" class="dropdown-custom">
+          <div class="px-4 py-3 border-b border-white/10 mb-1">
+            <p class="text-white font-sora font-bold text-sm"><%= m.getFirstname() %> <%= m.getLastname() != null ? m.getLastname() : "" %></p>
+            <p class="text-slate-400 font-mono text-[11px] truncate"><%= m.getEmail() %></p>
+          </div>
+          <a href="ViewProfile.jsp" class="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-indigo-600/20 text-xs font-medium transition-all">
+            <i class="fas fa-user-circle w-4 text-indigo-400"></i> View Profile
+          </a>
+          <a href="edit-profile.jsp" class="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-indigo-600/20 text-xs font-medium transition-all">
+            <i class="fas fa-sliders w-4 text-indigo-400"></i> Settings & Profile
+          </a>
+          <a href="Application-track.jsp" class="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-indigo-600/20 text-xs font-medium transition-all">
+            <i class="fas fa-paper-plane w-4 text-indigo-400"></i> Track Applications
+          </a>
+          <div class="border-t border-white/10 mt-1 pt-1">
+            <a href="logout" class="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 text-xs font-medium transition-all">
+              <i class="fas fa-power-off w-4"></i> Log Out
+            </a>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </nav>
 
-<!-- ══════════════════════════════════════════
-     HERO
-══════════════════════════════════════════ -->
-<section class="hero-mesh min-h-[520px] flex items-center py-20 relative">
-  <div class="max-w-7xl mx-auto px-5 relative z-10 w-full">
-    <div class="max-w-3xl mx-auto text-center">
-      <div class="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-xs text-white/80 mb-5">
-        <span class="w-1.5 h-1.5 rounded-full bg-yellow-400 inline-block"></span>
-        Welcome back, <%= m.getFirstname() %>! 👋
+<!-- ===== HERO HEADER WITH LIVE PARTICLE BACKGROUND ===== -->
+<section class="hero-glow-mesh pt-36 pb-28">
+  <canvas id="particleCanvas"></canvas>
+
+  <div class="max-w-7xl mx-auto px-6 relative z-10">
+
+    <div class="max-w-3xl mx-auto text-center space-y-6 mb-12">
+      <div class="inline-flex items-center gap-2.5 badge-glow-gradient rounded-full px-4 py-1.5 text-xs font-semibold text-purple-300 shadow-xl">
+        <i class="fas fa-bolt text-indigo-400"></i>
+        <span>Active Opportunities Available</span>
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
       </div>
-      <h1 class="font-sora text-4xl md:text-5xl font-bold text-white leading-tight tracking-tight mb-3">
-        Find Your <span class="text-yellow-400">Dream Job</span><br>The Smarter Way
+
+      <h1 class="font-sora text-4xl md:text-6xl font-extrabold text-white tracking-tight leading-[1.15]">
+        Find Your <span class="text-glow-gradient">Dream Job</span> Today
       </h1>
-      <p class="text-white/60 text-base mb-10">Browse thousands of jobs from top companies. Your next opportunity is just one search away.</p>
-      <form method="GET" action="user-home.jsp">
-        <div class="bg-white rounded-2xl p-2.5 flex flex-wrap gap-2 shadow-2xl">
-          <div class="search-field-wrap">
-            <i class="fas fa-search text-gray-400 text-sm flex-shrink-0"></i>
-            <input type="text" name="keyword" class="search-input" placeholder="Job title, skills or company...">
+
+      <p class="text-slate-300 text-sm md:text-base max-w-xl mx-auto font-normal leading-relaxed">
+        Discover verified positions from leading technology companies and top employers across India.
+      </p>
+    </div>
+
+    <!-- ===== FLOATING SEARCH BAR ===== -->
+    <div class="max-w-4xl mx-auto">
+      <div class="glow-search-card p-3 rounded-2xl shadow-2xl">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+          <div class="flex items-center gap-3 px-4 py-3 bg-slate-900/90 rounded-xl border border-white/10">
+            <i class="fas fa-search text-indigo-400 text-sm"></i>
+            <input type="text" id="searchInput" onkeyup="filterJobs()" placeholder="Title, skills, company..." class="w-full bg-transparent text-sm font-medium outline-none text-white placeholder:text-slate-500">
           </div>
-          <div class="w-px bg-gray-200 hidden sm:block self-stretch my-1"></div>
-          <div class="search-field-wrap">
-            <i class="fas fa-map-marker-alt text-gray-400 text-sm flex-shrink-0"></i>
-            <select name="location" class="search-input cursor-pointer">
-              <option value="">Anywhere</option>
-              <option value="ahmedabad">Ahmedabad</option>
-              <option value="surat">Surat</option>
-              <option value="mumbai">Mumbai</option>
-              <option value="bangalore">Bangalore</option>
-              <option value="delhi">Delhi</option>
-              <option value="remote">Remote</option>
+
+          <div class="flex items-center gap-3 px-4 py-3 bg-slate-900/90 rounded-xl border border-white/10">
+            <i class="fas fa-location-dot text-indigo-400 text-sm"></i>
+            <select id="locationSelect" onchange="filterJobs()" class="w-full bg-transparent text-sm font-medium outline-none text-slate-300 cursor-pointer">
+              <option value="" class="bg-slate-900">Any Location</option>
+              <option value="ahmedabad" class="bg-slate-900">Ahmedabad</option>
+              <option value="mumbai" class="bg-slate-900">Mumbai</option>
+              <option value="bangalore" class="bg-slate-900">Bangalore</option>
+              <option value="delhi" class="bg-slate-900">Delhi / NCR</option>
+              <option value="remote" class="bg-slate-900">Remote</option>
             </select>
           </div>
-          <div class="w-px bg-gray-200 hidden sm:block self-stretch my-1"></div>
-          <div class="search-field-wrap">
-            <i class="fas fa-briefcase text-gray-400 text-sm flex-shrink-0"></i>
-            <select name="jobType" class="search-input cursor-pointer">
-              <option value="">All Types</option>
-              <option value="fulltime">Full Time</option>
-              <option value="parttime">Part Time</option>
-              <option value="contract">Contract</option>
-              <option value="internship">Internship</option>
-            </select>
-          </div>
-          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all flex-shrink-0 flex items-center gap-2">
-            <i class="fas fa-search text-xs"></i> Search Jobs
+
+          <button type="button" onclick="filterJobs()" class="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-sora font-bold text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2">
+            <i class="fas fa-sliders text-xs"></i> Filter Results
           </button>
+
         </div>
-      </form>
-      <div class="mt-5 flex items-center justify-center gap-2 flex-wrap">
-        <span class="text-white/50 text-xs">Trending:</span>
-        <a href="#" class="text-xs bg-white/10 border border-white/20 text-white/80 hover:text-white hover:bg-white/20 rounded-full px-3 py-1 transition-all">Java</a>
-        <a href="#" class="text-xs bg-white/10 border border-white/20 text-white/80 hover:text-white hover:bg-white/20 rounded-full px-3 py-1 transition-all">Python</a>
-        <a href="#" class="text-xs bg-white/10 border border-white/20 text-white/80 hover:text-white hover:bg-white/20 rounded-full px-3 py-1 transition-all">React</a>
-        <a href="#" class="text-xs bg-white/10 border border-white/20 text-white/80 hover:text-white hover:bg-white/20 rounded-full px-3 py-1 transition-all">UI/UX</a>
-        <a href="#" class="text-xs bg-white/10 border border-white/20 text-white/80 hover:text-white hover:bg-white/20 rounded-full px-3 py-1 transition-all">DevOps</a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== STATS BANNER ===== -->
+<section class="bg-white border-y border-slate-200 py-10 shadow-sm">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      <div>
+        <p class="font-sora text-3xl md:text-4xl font-extrabold text-indigo-600 mb-1"><%= totalCandidates %>+</p>
+        <p class="text-[11px] font-mono text-slate-500 uppercase tracking-widest">Registered Candidates</p>
+      </div>
+      <div>
+        <p class="font-sora text-3xl md:text-4xl font-extrabold text-slate-900 mb-1"><%= totalJobs %>+</p>
+        <p class="text-[11px] font-mono text-slate-500 uppercase tracking-widest">Verified Openings</p>
+      </div>
+      <div>
+        <p class="font-sora text-3xl md:text-4xl font-extrabold text-slate-900 mb-1"><%= totalFilled %>+</p>
+        <p class="text-[11px] font-mono text-slate-500 uppercase tracking-widest">Applications Submitted</p>
+      </div>
+      <div>
+        <p class="font-sora text-3xl md:text-4xl font-extrabold text-indigo-600 mb-1"><%= totalCompanies %>+</p>
+        <p class="text-[11px] font-mono text-slate-500 uppercase tracking-widest">Hiring Partners</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ══════════════════════════════════════════
-     STATS
-══════════════════════════════════════════ -->
-<section class="stats-bg py-14 relative">
-  <div class="max-w-7xl mx-auto px-5 relative z-10">
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-      <div class="hover:-translate-y-1 transition-all">
-        <div class="font-sora text-4xl font-bold text-white mb-1"><span class="number" data-number="<%= totalCandidates %>">0</span>+</div>
-        <div class="text-xs text-white/50 uppercase tracking-widest">Candidates</div>
-      </div>
-      <div class="hover:-translate-y-1 transition-all">
-        <div class="font-sora text-4xl font-bold text-white mb-1"><span class="number" data-number="<%= totalJobs %>">0</span>+</div>
-        <div class="text-xs text-white/50 uppercase tracking-widest">Jobs Posted</div>
-      </div>
-      <div class="hover:-translate-y-1 transition-all">
-        <div class="font-sora text-4xl font-bold text-white mb-1"><span class="number" data-number="<%= totalFilled %>">0</span>+</div>
-        <div class="text-xs text-white/50 uppercase tracking-widest">Applications</div>
-      </div>
-      <div class="hover:-translate-y-1 transition-all">
-        <div class="font-sora text-4xl font-bold text-white mb-1"><span class="number" data-number="<%= totalCompanies %>">0</span>+</div>
-        <div class="text-xs text-white/50 uppercase tracking-widest">Companies</div>
-      </div>
-    </div>
-  </div>
-</section>
+<!-- ===== MAIN JOB LISTINGS SECTION ===== -->
+<section class="py-20 bg-slate-50">
+  <div class="max-w-6xl mx-auto px-6">
 
-<!-- ══════════════════════════════════════════
-     JOB LISTINGS
-══════════════════════════════════════════ -->
-<section class="py-16 bg-gray-50">
-  <div class="max-w-7xl mx-auto px-5">
-    <div class="text-center mb-10">
-      <p class="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-1">Opportunities</p>
-      <h2 class="font-sora text-2xl md:text-3xl font-bold text-gray-900 mb-2">Latest Job Listings</h2>
-      <p class="text-sm text-gray-500">Click any job to see full details, apply or save for later.</p>
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+      <div>
+        <p class="text-xs font-mono font-bold uppercase tracking-widest text-indigo-600 mb-1.5">— Latest Positions</p>
+        <h2 class="font-sora text-3xl font-extrabold text-slate-900">Featured Job Opportunities</h2>
+      </div>
+      <p class="text-xs text-slate-500 max-w-xs">Click quick view to see details or apply directly.</p>
     </div>
-    <div id="jobsContainer">
+
+    <!-- Job Cards Container -->
+    <div id="jobListContainer" class="space-y-4">
       <% if (jobList == null || jobList.isEmpty()) { %>
-        <div class="text-center py-16">
-          <div class="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
-            <i class="fas fa-briefcase text-2xl text-blue-300"></i>
+        <div class="bg-white rounded-2xl border border-slate-200 p-16 text-center">
+          <div class="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-4 text-2xl border border-indigo-100">
+            <i class="fas fa-briefcase"></i>
           </div>
-          <p class="font-sora font-semibold text-gray-700 text-lg mb-1">No Jobs Available</p>
-          <p class="text-sm text-gray-400">Check back soon for new opportunities!</p>
+          <p class="font-sora font-bold text-lg text-slate-900 mb-1">No Jobs Posted Yet</p>
+          <p class="text-xs text-slate-400">Please check back later for new career opportunities.</p>
         </div>
-      <% } else { %>
-        <% for (Postjob job : jobList) {
-          String jt = job.getJob_Type() != null ? job.getJob_Type().toLowerCase() : "";
-          String initial = job.getCompany_name() != null && !job.getCompany_name().isEmpty()
-              ? String.valueOf(job.getCompany_name().charAt(0)).toUpperCase() : "J";
-          boolean isFull = jt.contains("full");
-          boolean isPart = jt.contains("part");
-          String badgeClass = isFull ? "bg-blue-50 text-blue-600" : isPart ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600";
-        %>
-        <div class="job-card-item"
-          data-id="<%= job.getJob_id() %>"
-          data-title="<%= job.getJob_Title() != null ? job.getJob_Title().replace("\"","") : "" %>"
-          data-company="<%= job.getCompany_name() != null ? job.getCompany_name().replace("\"","") : "" %>"
-          data-location="<%= job.getLocation() != null ? job.getLocation() : "" %>"
-          data-type="<%= job.getJob_Type() != null ? job.getJob_Type() : "" %>"
-          data-salary="<%= job.getSalary() != null ? job.getSalary() : "" %>"
-          data-experience="<%= job.getExperience() != null ? job.getExperience() : "" %>"
-          data-opening="<%= job.getOpening() %>"
-          data-region="<%= job.getJob_Region() != null ? job.getJob_Region() : "" %>"
-          data-desc="<%= job.getJob_Description() != null ? job.getJob_Description().replace("\"","").replace("\n"," ") : "" %>"
-          data-skills="<%= job.getSkills_req() != null ? job.getSkills_req() : "" %>"
-          data-initial="<%= initial %>">
-          <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center font-sora font-bold text-blue-600 text-lg flex-shrink-0">
-              <%= initial %>
+      <% } else {
+          for (Postjob job : jobList) {
+            String jt = job.getJob_Type() != null ? job.getJob_Type().toLowerCase() : "";
+            String initialChar = job.getCompany_name() != null && !job.getCompany_name().isEmpty()
+                ? String.valueOf(job.getCompany_name().charAt(0)).toUpperCase() : "J";
+            boolean isFull = jt.contains("full");
+            boolean isPart = jt.contains("part");
+            String badgeStyle = isFull ? "bg-indigo-50 text-indigo-700 border-indigo-200" : isPart ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-purple-50 text-purple-700 border-purple-200";
+      %>
+        <div class="job-card-clean job-item flex flex-col md:flex-row md:items-center justify-between gap-6"
+             data-title="<%= job.getJob_Title() != null ? job.getJob_Title().toLowerCase() : "" %>"
+             data-company="<%= job.getCompany_name() != null ? job.getCompany_name().toLowerCase() : "" %>"
+             data-location="<%= job.getLocation() != null ? job.getLocation().toLowerCase() : "" %>">
+
+          <!-- Left Details -->
+          <div class="flex items-start sm:items-center gap-5 min-w-0">
+            <div class="w-12 h-12 rounded-2xl bg-slate-900 text-indigo-400 font-sora font-extrabold text-xl flex items-center justify-center flex-shrink-0 shadow-md">
+              <%= initialChar %>
             </div>
-            <div>
-              <h3 class="text-sm font-semibold text-gray-900 mb-0.5">
-                <%= job.getJob_Title() %>
-                <span class="text-blue-600 font-normal">@ <%= job.getCompany_name() %></span>
-              </h3>
-              <div class="flex items-center gap-2 flex-wrap mt-1">
-                <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium <%= badgeClass %>"><%= job.getJob_Type() %></span>
-                <span class="text-xs text-gray-400"><i class="fas fa-map-marker-alt mr-1"></i><%= job.getLocation() %></span>
-                <span class="text-xs text-gray-400"><i class="fas fa-rupee-sign mr-1"></i><%= job.getSalary() %></span>
-                <span class="text-xs text-gray-400"><i class="fas fa-clock mr-1"></i><%= job.getExperience() %> yr exp</span>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 class="font-sora font-bold text-base text-slate-900 truncate">
+                  <%= job.getJob_Title() %>
+                </h3>
+                <span class="text-xs text-slate-400 font-normal">@ <%= job.getCompany_name() %></span>
+                <span class="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200">
+                  <i class="fas fa-check-circle"></i> Verified
+                </span>
+              </div>
+
+              <div class="flex items-center gap-3 flex-wrap mt-2">
+                <span class="px-2.5 py-0.5 rounded-full border text-[11px] font-mono font-semibold <%= badgeStyle %>">
+                  <%= job.getJob_Type() %>
+                </span>
+                <span class="text-xs text-slate-500 font-mono"><i class="fas fa-location-dot text-indigo-600 mr-1"></i><%= job.getLocation() %></span>
+                <span class="text-xs text-slate-500 font-mono"><i class="fas fa-indian-rupee-sign text-indigo-600 mr-1"></i><%= job.getSalary() %></span>
+                <span class="text-xs text-slate-500 font-mono"><i class="fas fa-clock text-indigo-600 mr-1"></i><%= job.getExperience() %> yr exp</span>
               </div>
             </div>
           </div>
-          <button class="btn-view-details bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-all flex-shrink-0 mt-2 sm:mt-0">
-            View Details
-          </button>
+
+          <!-- Right Action Buttons -->
+          <div class="flex items-center gap-3 self-end md:self-center flex-shrink-0">
+
+            <button type="button"
+                    onclick="openJobModal('<%= job.getJobId() %>', '<%= job.getJob_Title() %>', '<%= job.getCompany_name() %>', '<%= job.getLocation() %>', '<%= job.getSalary() %>', '<%= job.getExperience() %>', '<%= job.getJob_Type() %>', '<%= job.getJob_Description() != null ? job.getJob_Description().replace("'", "\\'") : "" %>')"
+                    class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-all">
+              <i class="fas fa-eye mr-1 text-indigo-600"></i> Quick View
+            </button>
+
+            <a href="apply.jsp?job_id=<%= job.getJobId() %>" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-500/20">
+              <i class="fas fa-paper-plane mr-1"></i> Apply Now
+            </a>
+
+          </div>
+
         </div>
-        <% } %>
-      <% } %>
+      <% } } %>
     </div>
+
   </div>
 </section>
 
-<!-- ══════════════════════════════════════════
-     COMPANIES
-══════════════════════════════════════════ -->
-<section class="py-14 bg-white border-t border-gray-100">
-  <div class="max-w-7xl mx-auto px-5">
-    <div class="text-center mb-10">
-      <p class="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-1">Trusted by</p>
-      <h2 class="font-sora text-2xl md:text-3xl font-bold text-gray-900">Companies We've Helped</h2>
-    </div>
-    <div class="grid grid-cols-3 md:grid-cols-6 gap-6 items-center justify-items-center">
-      <img src="images/logo_mailchimp.svg" alt="Mailchimp" class="company-logo h-7 object-contain">
-      <img src="images/logo_paypal.svg"    alt="PayPal"    class="company-logo h-7 object-contain">
-      <img src="images/logo_stripe.svg"    alt="Stripe"    class="company-logo h-7 object-contain">
-      <img src="images/logo_visa.svg"      alt="Visa"      class="company-logo h-7 object-contain">
-      <img src="images/logo_apple.svg"     alt="Apple"     class="company-logo h-7 object-contain">
-      <img src="images/logo_airbnb.svg"    alt="Airbnb"    class="company-logo h-7 object-contain">
-    </div>
-  </div>
-</section>
+<!-- ===== CANDIDATE REVIEWS SECTION (EXACT GETTER BINDING FIX) ===== -->
+<section class="py-20 bg-white border-t border-slate-200">
+  <div class="max-w-6xl mx-auto px-6">
 
-<!-- ══════════════════════════════════════════
-     CTA
-══════════════════════════════════════════ -->
-<section class="py-16 relative overflow-hidden" style="background: linear-gradient(135deg, #1a56db 0%, #0f172a 100%);">
-  <div class="absolute inset-0 opacity-5" style="background-image:radial-gradient(circle,#fff 1px,transparent 1px);background-size:24px 24px;"></div>
-  <div class="max-w-2xl mx-auto px-5 text-center relative z-10">
-    <h2 class="font-sora text-3xl font-bold text-white mb-3">Ready to Take the Next Step?</h2>
-    <p class="text-white/60 text-base mb-8">Update your profile and let employers find you faster.</p>
-    <a href="EditProfile.jsp" class="inline-block bg-white text-blue-600 hover:bg-gray-50 font-sora font-semibold text-sm px-8 py-3.5 rounded-xl transition-all hover:-translate-y-0.5 shadow-lg">
-      Update My Profile
-    </a>
-  </div>
-</section>
-
-<!-- ══════════════════════════════════════════
-     JOB MODAL
-══════════════════════════════════════════ -->
-<div id="jobModal" class="job-modal-overlay" aria-hidden="true">
-  <div class="job-modal-box" role="dialog" aria-modal="true">
-    <button class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-lg" id="modalClose">&times;</button>
-    <div class="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center font-sora font-bold text-blue-600 text-xl mb-4" id="modalLogo">J</div>
-    <div class="font-sora text-xl font-bold text-gray-900 mb-1" id="modalTitle"></div>
-    <div class="text-sm text-blue-600 mb-4" id="modalCompany"></div>
-    <div class="flex gap-2 flex-wrap mb-4" id="modalTags"></div>
-    <div class="grid grid-cols-2 gap-3 mb-5">
-      <div class="bg-gray-50 rounded-xl p-3">
-        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Location</p>
-        <p class="text-sm font-semibold text-gray-900" id="modalLocation"></p>
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+      <div>
+        <p class="text-xs font-mono font-bold uppercase tracking-widest text-indigo-600 mb-1.5">— Verified Candidate Feedback</p>
+        <h2 class="font-sora text-3xl font-extrabold text-slate-900">What Candidates Say</h2>
       </div>
-      <div class="bg-gray-50 rounded-xl p-3">
-        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Salary</p>
-        <p class="text-sm font-semibold text-gray-900" id="modalSalary"></p>
-      </div>
-      <div class="bg-gray-50 rounded-xl p-3">
-        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Experience</p>
-        <p class="text-sm font-semibold text-gray-900" id="modalExp"></p>
-      </div>
-      <div class="bg-gray-50 rounded-xl p-3">
-        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Openings</p>
-        <p class="text-sm font-semibold text-gray-900" id="modalOpening"></p>
-      </div>
-    </div>
-    <p class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Job Description</p>
-    <div class="text-sm text-gray-600 leading-relaxed bg-gray-50 rounded-xl p-4 mb-4" id="modalDesc"></div>
-    <p class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Skills Required</p>
-    <div class="flex gap-2 flex-wrap mb-5" id="modalSkills"></div>
-
-    <input type="hidden" id="applyJobId" value="">
-    <input type="hidden" id="applyJobTitle" value="">
-
-    <div class="flex gap-2 flex-wrap mb-4">
-      <button class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all flex items-center gap-2"
-              onclick="window.location.href='apply.jsp?job_id=' + document.getElementById('applyJobId').value">
-        <i class="fas fa-paper-plane text-xs"></i> Apply Now
-      </button>
-      <form action="SaveJobServlet" method="post" style="display:inline;">
-        <input type="hidden" name="jobId" id="saveJobId" value="">
-        <input type="hidden" name="action" value="save">
-        <button type="submit" class="bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all flex items-center gap-2">
-          <i class="fas fa-bookmark text-xs"></i> Save Job
-        </button>
-      </form>
-      <a href="review.jsp" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all flex items-center gap-2">
-        <i class="fas fa-upload text-xs"></i> Upload Review
+      <a href="review.jsp" class="inline-flex items-center gap-2 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-all">
+        Post Your Review <i class="fas fa-arrow-right text-[10px]"></i>
       </a>
-      <button class="bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm px-5 py-2.5 rounded-xl transition-all" id="closeModalBtn" type="button">Close</button>
     </div>
+
+    <!-- Dynamic Review Cards Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+      <% if (reviewList == null || reviewList.isEmpty()) { %>
+        <!-- Default Fallback Cards if DB is Empty -->
+        <div class="bg-slate-50 border border-slate-200 p-7 rounded-2xl space-y-5 flex flex-col justify-between shadow-sm">
+          <div class="space-y-3">
+            <div class="flex items-center gap-1 text-amber-400 text-xs">
+              <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed italic">
+              "JobBoard made my application tracking effortless. Applied directly from Saved Jobs and received an interview offer in 48 hours!"
+            </p>
+          </div>
+          <div class="flex items-center gap-3 pt-4 border-t border-slate-200">
+            <div class="w-9 h-9 rounded-full bg-indigo-600 text-white font-sora font-bold text-xs flex items-center justify-center">P</div>
+            <div>
+              <p class="font-sora font-bold text-xs text-slate-900">Pooja Sharma</p>
+              <p class="text-[10px] text-slate-500 font-mono">Software Engineer @ TechCorp</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200 p-7 rounded-2xl space-y-5 flex flex-col justify-between shadow-sm">
+          <div class="space-y-3">
+            <div class="flex items-center gap-1 text-amber-400 text-xs">
+              <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed italic">
+              "Direct recruiter response with live status updates on applications. The candidate settings page is super clean."
+            </p>
+          </div>
+          <div class="flex items-center gap-3 pt-4 border-t border-slate-200">
+            <div class="w-9 h-9 rounded-full bg-purple-600 text-white font-sora font-bold text-xs flex items-center justify-center">R</div>
+            <div>
+              <p class="font-sora font-bold text-xs text-slate-900">Rahul Verma</p>
+              <p class="text-[10px] text-slate-500 font-mono">Full Stack Developer</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200 p-7 rounded-2xl space-y-5 flex flex-col justify-between shadow-sm">
+          <div class="space-y-3">
+            <div class="flex items-center gap-1 text-amber-400 text-xs">
+              <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed italic">
+              "The direct apply modal and quick view options saved so much time. Highly recommended for active job seekers!"
+            </p>
+          </div>
+          <div class="flex items-center gap-3 pt-4 border-t border-slate-200">
+            <div class="w-9 h-9 rounded-full bg-blue-600 text-white font-sora font-bold text-xs flex items-center justify-center">A</div>
+            <div>
+              <p class="font-sora font-bold text-xs text-slate-900">Ananya Patel</p>
+              <p class="text-[10px] text-slate-500 font-mono">UI/UX Designer</p>
+            </div>
+          </div>
+        </div>
+      <% } else {
+          for (review rev : reviewList) {
+            String rName = rev.getName() != null && !rev.getName().trim().isEmpty() ? rev.getName() : "Candidate";
+            String rText = rev.getText() != null && !rev.getText().trim().isEmpty() ? rev.getText() : "No review text provided.";
+            int rating   = rev.getRating() > 0 ? rev.getRating() : 5;
+            String rInit = String.valueOf(rName.charAt(0)).toUpperCase();
+      %>
+        <!-- Dynamic Review Item Bound to Exact Review Model -->
+        <div class="bg-slate-50 border border-slate-200 p-7 rounded-2xl space-y-5 flex flex-col justify-between shadow-sm hover:border-indigo-300 transition-all">
+          <div class="space-y-3">
+            <div class="flex items-center gap-1 text-amber-400 text-xs">
+              <% for (int s = 0; s < rating; s++) { %>
+                <i class="fas fa-star"></i>
+              <% } %>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed italic">
+              "<%= rText %>"
+            </p>
+          </div>
+          <div class="flex items-center gap-3 pt-4 border-t border-slate-200">
+            <div class="w-9 h-9 rounded-full bg-indigo-600 text-white font-sora font-bold text-xs flex items-center justify-center shadow-sm">
+              <%= rInit %>
+            </div>
+            <div>
+              <p class="font-sora font-bold text-xs text-slate-900"><%= rName %></p>
+              <p class="text-[10px] text-slate-500 font-mono">Verified Candidate</p>
+            </div>
+          </div>
+        </div>
+      <%   }
+         } %>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===== QUICK VIEW JOB MODAL ===== -->
+<div id="jobModal" class="modal-backdrop">
+  <div class="bg-white border border-slate-200 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden m-4 animate-fade-up">
+
+    <!-- Modal Header -->
+    <div class="bg-slate-900 text-white px-6 py-5 flex items-center justify-between">
+      <div>
+        <h3 class="font-sora font-bold text-base text-white" id="modalTitle">Job Title</h3>
+        <p class="text-xs text-slate-400 mt-0.5" id="modalCompany">Company Name</p>
+      </div>
+      <button type="button" onclick="closeJobModal()" class="text-slate-400 hover:text-white text-lg">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <!-- Modal Content -->
+    <div class="p-6 space-y-5">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Location</p>
+          <p class="text-xs font-semibold text-slate-800 mt-0.5" id="modalLocation">-</p>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Salary</p>
+          <p class="text-xs font-semibold text-slate-800 mt-0.5" id="modalSalary">-</p>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Experience</p>
+          <p class="text-xs font-semibold text-slate-800 mt-0.5" id="modalExp">-</p>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Job Type</p>
+          <p class="text-xs font-semibold text-slate-800 mt-0.5" id="modalType">-</p>
+        </div>
+      </div>
+
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Job Description</p>
+        <p class="text-xs text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200" id="modalDesc">
+          No description available.
+        </p>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+        <button type="button" onclick="closeJobModal()" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold">
+          Close
+        </button>
+        <a id="modalApplyBtn" href="#" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-500/20">
+          <i class="fas fa-paper-plane mr-1"></i> Apply Position
+        </a>
+      </div>
+    </div>
+
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════
-     SCRIPTS
-══════════════════════════════════════════ -->
+<!-- ===== FOOTER ===== -->
+<footer class="bg-slate-900 text-white pt-16 pb-8 border-t border-slate-800">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-10 pb-12 border-b border-slate-800">
+
+      <div class="space-y-3">
+        <a href="user-home.jsp" class="font-sora font-extrabold text-xl text-white">
+          Job<span class="text-indigo-400">Board</span>
+        </a>
+        <p class="text-xs text-slate-400 leading-relaxed">Enterprise career network connecting candidates with leading companies in India.</p>
+      </div>
+
+      <div>
+        <p class="text-xs font-mono font-bold uppercase tracking-wider text-indigo-400 mb-4">Navigation</p>
+        <ul class="space-y-2 text-xs text-slate-400">
+          <li><a href="user-home.jsp" class="hover:text-white transition-colors">Home Portal</a></li>
+          <li><a href="Application-track.jsp" class="hover:text-white transition-colors">Applications Tracker</a></li>
+          <li><a href="Saved-jobs.jsp" class="hover:text-white transition-colors">Saved Jobs</a></li>
+          <li><a href="review.jsp" class="hover:text-white transition-colors">Candidate Reviews</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="text-xs font-mono font-bold uppercase tracking-wider text-indigo-400 mb-4">Account</p>
+        <ul class="space-y-2 text-xs text-slate-400">
+          <li><a href="ViewProfile.jsp" class="hover:text-white transition-colors">View Profile</a></li>
+          <li><a href="edit-profile.jsp" class="hover:text-white transition-colors">Settings & Profile</a></li>
+          <li><a href="contact.jsp" class="hover:text-white transition-colors">Support Desk</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="text-xs font-mono font-bold uppercase tracking-wider text-indigo-400 mb-4">Headquarters</p>
+        <p class="text-xs text-slate-400 leading-relaxed">Corporate Road, SG Highway, Ahmedabad, Gujarat 380015</p>
+      </div>
+
+    </div>
+
+    <div class="pt-8 text-center text-xs text-slate-500 font-mono">
+      &copy; 2026 JobBoard Portal. All rights reserved.
+    </div>
+  </div>
+</footer>
+
 <script>
-  // ── Helpers ──
-  function safeGet(id) { return document.getElementById(id); }
+  // Profile Avatar Toggle
+  const avatarBtn = document.getElementById('avatarBtn');
+  const avatarMenu = document.getElementById('avatarMenu');
 
-  // ── Mobile hamburger ──
-  safeGet('mobileToggle').addEventListener('click', function () {
-    const menu = safeGet('mobileMenu');
-    const icon = safeGet('menuIcon');
-    menu.classList.toggle('open');
-    icon.className = menu.classList.contains('open') ? 'fas fa-times text-sm' : 'fas fa-bars text-sm';
-  });
-
-  // ── Dropdown helper (click-based, closes on outside click) ──
-  function setupDropdown(btnId, menuId, chevronId) {
-    const btn    = safeGet(btnId);
-    const menu   = safeGet(menuId);
-    const chev   = chevronId ? safeGet(chevronId) : null;
-    if (!btn || !menu) return;
-
-    btn.addEventListener('click', function (e) {
+  if (avatarBtn && avatarMenu) {
+    avatarBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const isOpen = menu.classList.contains('show');
-      // close all dropdowns first
-      document.querySelectorAll('.nav-dropdown-menu, .avatar-dropdown-menu').forEach(m => m.classList.remove('show'));
-      if (chev) chev.style.transform = '';
-      // then open this one if it was closed
-      if (!isOpen) {
-        menu.classList.add('show');
-        if (chev) chev.style.transform = 'rotate(180deg)';
-      }
+      avatarMenu.classList.toggle('show');
     });
 
-    // Keep menu open when clicking inside it (so links work)
-    menu.addEventListener('click', function (e) {
-      e.stopPropagation();
+    document.addEventListener('click', () => {
+      avatarMenu.classList.remove('show');
     });
   }
 
-  setupDropdown('accountDropBtn', 'accountDropMenu', null);
-  setupDropdown('avatarDropBtn',  'avatarDropMenu',  'avatarChevron');
+  // Client-side Instant Job Filtering
+  function filterJobs() {
+    const searchVal = document.getElementById('searchInput').value.toLowerCase();
+    const locVal = document.getElementById('locationSelect').value.toLowerCase();
+    const jobItems = document.querySelectorAll('.job-item');
 
-  // Close all dropdowns when clicking anywhere outside
-  document.addEventListener('click', function () {
-    document.querySelectorAll('.nav-dropdown-menu, .avatar-dropdown-menu').forEach(m => m.classList.remove('show'));
-    const chev = safeGet('avatarChevron');
-    if (chev) chev.style.transform = '';
-  });
+    jobItems.forEach(item => {
+      const title = item.getAttribute('data-title');
+      const company = item.getAttribute('data-company');
+      const location = item.getAttribute('data-location');
 
-  // ── Animated counters ──
-  function animateCounter(el) {
-    const target = parseInt(el.getAttribute('data-number'));
-    if (!target) { el.textContent = '0'; return; }
-    let current = 0;
-    const inc = target / 60;
-    const timer = setInterval(() => {
-      current += inc;
-      if (current >= target) { current = target; clearInterval(timer); }
-      el.textContent = Math.floor(current);
-    }, 20);
-  }
-  const obs = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) { animateCounter(e.target); obs.unobserve(e.target); }
+      const matchesSearch = title.includes(searchVal) || company.includes(searchVal);
+      const matchesLoc = locVal === "" || location.includes(locVal);
+
+      if (matchesSearch && matchesLoc) {
+        item.style.display = 'flex';
+      } else {
+        item.style.display = 'none';
+      }
     });
-  }, { threshold: 0.5 });
-  document.querySelectorAll('.number[data-number]').forEach(c => obs.observe(c));
+  }
 
-  // ── Job modal ──
-  (function () {
-    const modal        = safeGet('jobModal');
-    const closeModalBtn = safeGet('closeModalBtn');
-    const modalClose   = safeGet('modalClose');
+  // Quick View Modal Controls
+  function openJobModal(id, title, company, location, salary, exp, type, desc) {
+    document.getElementById('modalTitle').innerText = title;
+    document.getElementById('modalCompany').innerText = '@ ' + company;
+    document.getElementById('modalLocation').innerText = location || 'Not Specified';
+    document.getElementById('modalSalary').innerText = salary ? '₹' + salary : 'Disclosed on Application';
+    document.getElementById('modalExp').innerText = exp ? exp + ' Years' : 'Freshers Allowed';
+    document.getElementById('modalType').innerText = type || 'Full Time';
+    document.getElementById('modalDesc').innerText = desc || 'No detailed description provided.';
+    document.getElementById('modalApplyBtn').href = 'apply.jsp?job_id=' + id;
 
-    function openModal(card) {
-      const d = card.dataset;
-      safeGet('modalLogo').textContent     = d.initial || 'J';
-      safeGet('modalTitle').textContent    = d.title || '';
-      safeGet('modalCompany').textContent  = '@ ' + (d.company || '');
-      safeGet('modalLocation').textContent = d.location || '';
-      safeGet('modalSalary').textContent   = d.salary ? '₹' + d.salary : '';
-      safeGet('modalExp').textContent      = d.experience ? d.experience + ' years' : '';
-      safeGet('modalOpening').textContent  = d.opening ? d.opening + ' seats' : '';
-      safeGet('modalDesc').textContent     = d.desc || 'No description available.';
-      if (safeGet('applyJobId'))    safeGet('applyJobId').value    = d.id || '';
-      if (safeGet('applyJobTitle')) safeGet('applyJobTitle').value = d.title || '';
-      if (safeGet('saveJobId'))     safeGet('saveJobId').value     = d.id || '';
+    document.getElementById('jobModal').classList.add('active');
+  }
 
-      // type badge
-      const tagsEl = safeGet('modalTags');
-      if (tagsEl) {
-        const jt = d.type || '';
-        const isFull = jt.toLowerCase().includes('full');
-        const isPart = jt.toLowerCase().includes('part');
-        const bc = isFull ? 'bg-blue-50 text-blue-600' : isPart ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600';
-        tagsEl.innerHTML = jt ? '<span class="inline-block px-2.5 py-1 rounded-full text-xs font-medium ' + bc + '">' + jt + '</span>' : '';
+  function closeJobModal() {
+    document.getElementById('jobModal').classList.remove('active');
+  }
+
+  // ===== LIVE CANVAS PARTICLES SCRIPT =====
+  const canvas = document.getElementById('particleCanvas');
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    class Particle {
+      constructor() {
+        this.reset();
       }
-
-      // skills
-      const skillsEl = safeGet('modalSkills');
-      if (skillsEl) {
-        skillsEl.innerHTML = '';
-        (d.skills ? d.skills.split(',') : []).forEach(s => {
-          if (s.trim()) {
-            const tag = document.createElement('span');
-            tag.className = 'bg-blue-50 text-blue-600 border border-blue-100 rounded-full px-3 py-1 text-xs font-medium';
-            tag.textContent = s.trim();
-            skillsEl.appendChild(tag);
-          }
-        });
+      reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2 + 0.5;
+        this.speedX = (Math.random() - 0.5) * 0.4;
+        this.speedY = (Math.random() - 0.5) * 0.4;
+        this.alpha = Math.random() * 0.5 + 0.2;
       }
-
-      modal.classList.add('active');
-      document.body.style.overflow = 'hidden';
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {
+          this.reset();
+        }
+      }
+      draw() {
+        ctx.fillStyle = 'rgba(168, 85, 247, ' + this.alpha + ')';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
-    function closeModal() {
-      modal.classList.remove('active');
-      document.body.style.overflow = '';
+    for (let i = 0; i < 45; i++) {
+      particles.push(new Particle());
     }
 
-    // Delegate clicks on job list
-    const jobsContainer = safeGet('jobsContainer');
-    if (jobsContainer) {
-      jobsContainer.addEventListener('click', function (e) {
-        const viewBtn = e.target.closest('.btn-view-details');
-        const card    = e.target.closest('.job-card-item');
-        if (viewBtn && card) { e.stopPropagation(); openModal(card); return; }
-        if (card) { window.location.href = 'apply.jsp?job_id=' + card.dataset.id; }
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        p.update();
+        p.draw();
       });
+      requestAnimationFrame(animateParticles);
     }
-
-    if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
-    if (modalClose)    modalClose.addEventListener('click', closeModal);
-    window.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
-  })();
+    animateParticles();
+  }
 </script>
+
 </body>
 </html>

@@ -1,8 +1,15 @@
 package com.model;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "userregister")
 public class UserModel 
 {
-	private int userid,pincode,isVerified;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private int userid;
+	private int pincode,isVerified;
 	public int getIsVerified() {
 		return isVerified;
 	}
@@ -10,7 +17,7 @@ public class UserModel
 		this.isVerified = isVerified;
 	}
 	private String firstname,lastname,email,contact,address,city,state,password,role;
-	
+	private String profilePic;
 	
 	public String getContact() {
 		return contact;
@@ -78,5 +85,15 @@ public class UserModel
 	}
 	public void setRole(String role) {
 		this.role = role;
+	}
+
+
+
+	public String getProfilePic() {
+		return profilePic;
+	}
+
+	public void setProfilePic(String profilePic) {
+		this.profilePic = profilePic;
 	}
 }

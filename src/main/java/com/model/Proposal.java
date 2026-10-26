@@ -1,5 +1,14 @@
 package com.model;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+
+@Entity
 public class Proposal {
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
     private int proposalId;
     private String companyname, companyemail, proposaltitle, proposaldesc, terms, dealamount, status, createddate;
 	public int getProposalId() {

@@ -1,7 +1,13 @@
 package com.model;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "companyverify")
 public class companyverify 
 {
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private int company_id;
 	private String companyname,password,email,website,location,industry,companysize,about,status;
 	public int getCompany_id() {

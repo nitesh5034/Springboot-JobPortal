@@ -1,50 +1,47 @@
 package com.controller;
 
-import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
-import java.io.IOException;
-import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
-import com.dao.CompanyDao;
+import java.util.List;
+import java.util.Optional;
+
+import com.Repository.CompanyVerifyRepository;
+import com.Repository.ApplicationRepository;
 import com.model.companyverify;
 import com.model.application;
 
-@WebServlet("/CompanyController")
-public class CompanyController extends HttpServlet {
-    private static final long serialVersionUID = 1L;
+@Controller
+public class CompanyController {
 
-    public CompanyController() {
-        super();
-    }
+    @Autowired
+    private CompanyVerifyRepository companyVerifyRepository;
+    @Autowired
+    private ApplicationRepository applicationRepository;
+    @GetMapping("/CompanyController")
+    public String doGet(HttpSession session, Model model) {
 
-    // ── SHOW DATA (GET METHOD) ──
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        
-        HttpSession session = request.getSession();
         companyverify c = (companyverify) session.getAttribute("Model");
 
-        if (c != null) 
-        {
-            CompanyDao dao = new CompanyDao();
-            List<application> appList = dao.getApplicationsForCompany();
-            request.setAttribute("appList", appList);
-            request.getRequestDispatcher("company-home.jsp").forward(request, response);
-        } 
-        else 
-        {
-            response.sendRedirect("login.jsp");
+        if (c != null) {
+
+            List<application> appList = applicationRepository.findAll();
+            model.addAttribute("appList", appList);
+            return "forward:/company-home.jsp";
+        } else {
+            return "redirect:/login.jsp";
         }
     }
 
-    // ── REGISTER & LOGIN (POST METHOD) ──
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-
-        String action = request.getParameter("action");
+    @PostMapping("/CompanyController")
+    public String doPost(HttpServletRequest request, @RequestParam(value = "action", required = false) String action, HttpSession session) {
 
         // ── REGISTER LOGIC ──
         if ("register".equals(action)) {
@@ -59,42 +56,38 @@ public class CompanyController extends HttpServlet {
             c.setAbout(request.getParameter("about"));
             c.setStatus("pending");
 
-            CompanyDao dao = new CompanyDao();
-            boolean success = dao.registerCompany(c);
+            companyverify savedCompany = companyVerifyRepository.save(c);
 
-            if (success) 
-            {
-                dao.addNotification("admin@jobboard.com", "New company request: " + c.getCompanyname());
-                response.sendRedirect("compny-pending.jsp?msg=success");
-            } 
-            else 
-            {
-                response.sendRedirect("company-register.jsp?error=1");
+            if (savedCompany != null) {
+
+                System.out.println("🔔 Notification logged for admin: New company request - " + c.getCompanyname());
+                return "redirect:/compny-pending.jsp?msg=success";
+            } else {
+                return "redirect:/company-register.jsp?error=1";
             }
 
-        // ── LOGIN LOGIC ──
+            // ── LOGIN LOGIC ──
         } else if ("login".equals(action)) {
             String email    = request.getParameter("email");
             String password = request.getParameter("password");
 
-            CompanyDao dao = new CompanyDao();
-            companyverify c = dao.loginCompany(email, password);
+            Optional<companyverify> compOpt = companyVerifyRepository.findFirstByEmailAndPassword(email, password);
 
-            if (c != null) {
+            if (compOpt.isPresent()) {
+                companyverify c = compOpt.get();
                 if ("approved".equalsIgnoreCase(c.getStatus())) {
-                    HttpSession session = request.getSession();
                     session.setAttribute("Model", c);
                     session.setAttribute("role", "employer");
-                  
-                    response.sendRedirect("CompanyController"); 
+                    return "redirect:/CompanyController";
                 } else if ("pending".equalsIgnoreCase(c.getStatus())) {
-                    response.sendRedirect("compny-pending.jsp?msg=waiting");
+                    return "redirect:/compny-pending.jsp?msg=waiting";
                 } else {
-                    response.sendRedirect("login.jsp?error=rejected");
+                    return "redirect:/login.jsp?error=rejected";
                 }
             } else {
-                response.sendRedirect("login.jsp?error=invalid");
+                return "redirect:/login.jsp?error=invalid";
             }
         }
+        return "redirect:/index.jsp";
     }
 }

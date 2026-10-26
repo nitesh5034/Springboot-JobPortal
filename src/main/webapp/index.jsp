@@ -23,14 +23,6 @@
     <!-- MAIN CSS -->
     <link rel="stylesheet" href="css/style.css">    
 </head>
-<body>
-
-
-
-
-
- <link rel="stylesheet" href="css/style.css">    
-  </head>
   <body id="top">
 
   <div id="overlayer"></div>
@@ -44,7 +36,6 @@
   <%@include file="header.jsp" %>
   <%@include file="banner.jsp"%>
   <%@include file="footer.jsp" %>
-  <%@include file="container.jsp" %>
 
 
  <!-- SCRIPTS -->
