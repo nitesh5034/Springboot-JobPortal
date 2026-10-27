@@ -671,7 +671,7 @@
                          text-xs font-bold transition-all">
 
             <i class="fas fa-times mr-1.5"></i>
-            Cancelgit status
+
 
           </button>
 
